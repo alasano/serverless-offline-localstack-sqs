@@ -306,13 +306,24 @@ export class MessagePoller {
   ): Promise<void> {
     const receiveCount = parseInt(message.Attributes?.ApproximateReceiveCount || "1", 10);
     const maxReceiveCount = queueConfig.dlq?.maxReceiveCount || this.config.maxReceiveCount;
+    const hasNativeRedrive = !!queueInfo.attributes?.RedrivePolicy;
 
     this.logger.warn(
       `Message ${message.MessageId} failed processing (attempt ${receiveCount}/${maxReceiveCount}): ${error?.message || "Unknown error"}`,
     );
 
-    // If max receive count reached and DLQ is enabled, send to DLQ
-    if (receiveCount >= maxReceiveCount && queueConfig.dlq?.enabled) {
+    if (receiveCount < maxReceiveCount) {
+      return;
+    }
+
+    // Priority: native redrive > plugin DLQ > terminal delete
+    if (hasNativeRedrive) {
+      // Queue has native SQS redrive policy — let SQS handle it
+      this.logger.debug(
+        `Message ${message.MessageId} reached max receive count but queue has native redrive policy, letting SQS handle it`,
+      );
+    } else if (queueConfig.dlq?.enabled) {
+      // Plugin DLQ configured — route to DLQ and delete from source
       try {
         const dlqName =
           queueConfig.dlq.queueName ||
@@ -343,6 +354,24 @@ export class MessagePoller {
         }
       } catch (dlqError: any) {
         this.logger.error(`Failed to send message to DLQ: ${dlqError.message}`);
+      }
+    } else {
+      // Terminal queue (no DLQ of any kind) — delete to prevent infinite retry loop
+      if (message.ReceiptHandle) {
+        try {
+          await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle);
+          this.logger.warn(
+            `Message ${message.MessageId} exceeded max receive count (${maxReceiveCount}), deleted (no DLQ configured)`,
+          );
+        } catch (deleteError: any) {
+          this.logger.error(
+            `Failed to delete exhausted message ${message.MessageId}: ${deleteError.message}`,
+          );
+        }
+      } else {
+        this.logger.warn(
+          `Message ${message.MessageId} exceeded max receive count but missing ReceiptHandle, cannot delete`,
+        );
       }
     }
   }
