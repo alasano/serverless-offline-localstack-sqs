@@ -150,9 +150,9 @@ jobs:
         $CHANGELOG
         
         ## Installation
-        
+
         \`\`\`bash
-        npm install serverless-offline-localstack-sqs
+        npm install @alasano/serverless-offline-localstack-sqs
         \`\`\`
         
         ## Usage
