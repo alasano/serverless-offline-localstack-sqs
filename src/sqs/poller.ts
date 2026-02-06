@@ -1,9 +1,9 @@
-import { Message } from '@aws-sdk/client-sqs';
-import { SqsClientWrapper, QueueInfo } from './client';
-import { LambdaInvoker, FunctionDefinition, HandlerResult } from '../lambda/invoker';
-import { EventBuilder } from '../lambda/event-builder';
-import { Logger } from '../utils/logger';
-import { PluginConfig, QueueConfig } from '../config/defaults';
+import { Message } from "@aws-sdk/client-sqs";
+import { SqsClientWrapper, QueueInfo } from "./client";
+import { LambdaInvoker, FunctionDefinition, HandlerResult } from "../lambda/invoker";
+import { EventBuilder } from "../lambda/event-builder";
+import { Logger } from "../utils/logger";
+import { PluginConfig, QueueConfig } from "../config/defaults";
 
 export interface PollerState {
   isPolling: boolean;
@@ -26,7 +26,7 @@ export class MessagePoller {
     sqsClient: SqsClientWrapper,
     lambdaInvoker: LambdaInvoker,
     config: PluginConfig,
-    logger: Logger
+    logger: Logger,
   ) {
     this.sqsClient = sqsClient;
     this.lambdaInvoker = lambdaInvoker;
@@ -58,7 +58,7 @@ export class MessagePoller {
 
     try {
       const queueInfo = await this.sqsClient.getQueueInfo(queueName);
-      
+
       this.pollerStates.set(pollerId, {
         isPolling: true,
         messageCount: 0,
@@ -80,13 +80,13 @@ export class MessagePoller {
             consecutiveErrors++;
             const backoff = Math.min(1000 * Math.pow(2, consecutiveErrors), 30000);
             this.logger.error(
-              `Poll error for ${queueName} (attempt ${consecutiveErrors}): ${error.message}. Retrying in ${backoff}ms`
+              `Poll error for ${queueName} (attempt ${consecutiveErrors}): ${error.message}. Retrying in ${backoff}ms`,
             );
-            await new Promise(resolve => setTimeout(resolve, backoff));
+            await new Promise((resolve) => setTimeout(resolve, backoff));
             continue;
           }
           if (!controller.signal.aborted) {
-            await new Promise(resolve => setTimeout(resolve, this.config.pollInterval));
+            await new Promise((resolve) => setTimeout(resolve, this.config.pollInterval));
           }
         }
       };
@@ -113,7 +113,7 @@ export class MessagePoller {
       queueInfo.queueUrl,
       queueConfig.batchSize || 1,
       queueConfig.visibilityTimeout || this.config.visibilityTimeout,
-      queueConfig.waitTimeSeconds || this.config.waitTimeSeconds
+      queueConfig.waitTimeSeconds || this.config.waitTimeSeconds,
     );
 
     if (messages.length === 0) {
@@ -136,7 +136,7 @@ export class MessagePoller {
   private async processMessages(
     messages: Message[],
     queueConfig: QueueConfig,
-    queueInfo: QueueInfo
+    queueInfo: QueueInfo,
   ): Promise<void> {
     const batchSize = queueConfig.batchSize || 1;
     const maxConcurrency = queueConfig.maxConcurrentPolls || this.config.maxConcurrentPolls;
@@ -150,7 +150,9 @@ export class MessagePoller {
     // Process chunks with concurrency limits
     for (let i = 0; i < chunks.length; i += maxConcurrency) {
       const concurrentChunks = chunks.slice(i, i + maxConcurrency);
-      const promises = concurrentChunks.map(chunk => this.processBatch(chunk, queueConfig, queueInfo));
+      const promises = concurrentChunks.map((chunk) =>
+        this.processBatch(chunk, queueConfig, queueInfo),
+      );
 
       await Promise.all(promises);
     }
@@ -159,10 +161,10 @@ export class MessagePoller {
   private async processBatch(
     messages: Message[],
     queueConfig: QueueConfig,
-    queueInfo: QueueInfo
+    queueInfo: QueueInfo,
   ): Promise<void> {
     const { queueName, handler } = queueConfig;
-    const messageIds = messages.map(m => m.MessageId).join(', ');
+    const messageIds = messages.map((m) => m.MessageId).join(", ");
 
     try {
       // Build SQS event with all messages in the batch
@@ -178,7 +180,7 @@ export class MessagePoller {
       const result: HandlerResult = await this.lambdaInvoker.invokeHandler(
         handler,
         sqsEvent,
-        functionDefinition
+        functionDefinition,
       );
 
       if (result.success) {
@@ -192,7 +194,9 @@ export class MessagePoller {
           receiptHandles.push(message.ReceiptHandle);
         }
         await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
-        this.logger.debug(`Successfully processed batch of ${messages.length} message(s) [${messageIds}] from queue: ${queueName}`);
+        this.logger.debug(
+          `Successfully processed batch of ${messages.length} message(s) [${messageIds}] from queue: ${queueName}`,
+        );
       } else {
         // On failure, all messages in the batch fail together (AWS synchronous invocation behavior)
         for (const message of messages) {
@@ -211,35 +215,39 @@ export class MessagePoller {
     message: Message,
     queueConfig: QueueConfig,
     queueInfo: QueueInfo,
-    error?: Error
+    error?: Error,
   ): Promise<void> {
-    const receiveCount = parseInt(message.Attributes?.ApproximateReceiveCount || '1', 10);
+    const receiveCount = parseInt(message.Attributes?.ApproximateReceiveCount || "1", 10);
     const maxReceiveCount = queueConfig.dlq?.maxReceiveCount || this.config.maxReceiveCount;
 
     this.logger.warn(
-      `Message ${message.MessageId} failed processing (attempt ${receiveCount}/${maxReceiveCount}): ${error?.message || 'Unknown error'}`
+      `Message ${message.MessageId} failed processing (attempt ${receiveCount}/${maxReceiveCount}): ${error?.message || "Unknown error"}`,
     );
 
     // If max receive count reached and DLQ is enabled, send to DLQ
     if (receiveCount >= maxReceiveCount && queueConfig.dlq?.enabled) {
       try {
-        const dlqName = queueConfig.dlq.queueName || `${queueConfig.queueName}${this.config.deadLetterQueueSuffix}`;
+        const dlqName =
+          queueConfig.dlq.queueName ||
+          `${queueConfig.queueName}${this.config.deadLetterQueueSuffix}`;
         const dlqInfo = await this.sqsClient.getQueueInfo(dlqName);
-        
+
         if (dlqInfo) {
           // Send message to DLQ with original body preserved (matches real AWS redrive behavior)
-          await this.sqsClient.sendMessage(dlqInfo.queueUrl, message.Body || '');
+          await this.sqsClient.sendMessage(dlqInfo.queueUrl, message.Body || "");
 
           // Delete original message — if this fails, the message may exist in both queues
           // temporarily, but it will eventually expire or be reprocessed from the source queue
           if (!message.ReceiptHandle) {
-            this.logger.warn(`Message ${message.MessageId} missing ReceiptHandle, skipping delete from source queue`);
+            this.logger.warn(
+              `Message ${message.MessageId} missing ReceiptHandle, skipping delete from source queue`,
+            );
           } else {
             try {
               await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle);
             } catch (deleteError: any) {
               this.logger.warn(
-                `Message ${message.MessageId} sent to DLQ but failed to delete from source queue: ${deleteError.message}`
+                `Message ${message.MessageId} sent to DLQ but failed to delete from source queue: ${deleteError.message}`,
               );
             }
           }
@@ -253,7 +261,7 @@ export class MessagePoller {
   }
 
   stopPolling(): void {
-    this.logger.info('Stopping all SQS pollers');
+    this.logger.info("Stopping all SQS pollers");
 
     for (const [pollerId, controller] of this.pollers.entries()) {
       controller.abort();

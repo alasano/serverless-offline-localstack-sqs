@@ -1,11 +1,11 @@
-import ServerlessOfflineLocalstackSqsPlugin from '../src/index';
+import ServerlessOfflineLocalstackSqsPlugin from "../src/index";
 
 // Mock all dependencies
-jest.mock('../src/sqs/client');
-jest.mock('../src/sqs/queue-manager');
-jest.mock('../src/sqs/poller');
-jest.mock('../src/lambda/invoker');
-jest.mock('../src/utils/docker');
+jest.mock("../src/sqs/client");
+jest.mock("../src/sqs/queue-manager");
+jest.mock("../src/sqs/poller");
+jest.mock("../src/lambda/invoker");
+jest.mock("../src/utils/docker");
 
 // Mock logger specifically
 const mockLogger = {
@@ -15,12 +15,12 @@ const mockLogger = {
   debug: jest.fn(),
 };
 
-jest.mock('../src/utils/logger', () => ({
+jest.mock("../src/utils/logger", () => ({
   createLogger: jest.fn(() => mockLogger),
   ConsoleLogger: jest.fn(() => mockLogger),
 }));
 
-describe('ServerlessOfflineLocalstackSqsPlugin', () => {
+describe("ServerlessOfflineLocalstackSqsPlugin", () => {
   let serverlessInstance: any;
   let options: any;
   let plugin: ServerlessOfflineLocalstackSqsPlugin;
@@ -28,20 +28,20 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
   beforeEach(() => {
     serverlessInstance = {
       service: {
-        service: 'test-service',
+        service: "test-service",
         provider: {
-          name: 'aws',
-          region: 'us-east-1',
-          stage: 'dev',
-          runtime: 'nodejs20.x',
+          name: "aws",
+          region: "us-east-1",
+          stage: "dev",
+          runtime: "nodejs20.x",
         },
         functions: {
           testFunction: {
-            handler: 'handler.test',
+            handler: "handler.test",
             events: [
               {
                 sqs: {
-                  arn: 'arn:aws:sqs:us-east-1:123456789012:test-queue',
+                  arn: "arn:aws:sqs:us-east-1:123456789012:test-queue",
                   batchSize: 1,
                 },
               },
@@ -51,23 +51,23 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         resources: {
           Resources: {
             TestQueue: {
-              Type: 'AWS::SQS::Queue',
+              Type: "AWS::SQS::Queue",
               Properties: {
-                QueueName: 'test-queue',
+                QueueName: "test-queue",
               },
             },
           },
         },
         custom: {
-          'serverless-offline-localstack-sqs': {
+          "serverless-offline-localstack-sqs": {
             enabled: true,
-            endpoint: 'http://localhost:4566',
+            endpoint: "http://localhost:4566",
             debug: true,
           },
         },
       },
       config: {
-        servicePath: '/test/service/path',
+        servicePath: "/test/service/path",
       },
       pluginManager: {
         addPlugin: jest.fn(),
@@ -78,32 +78,32 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
     };
 
     options = {
-      stage: 'dev',
-      region: 'us-east-1',
+      stage: "dev",
+      region: "us-east-1",
     };
 
     plugin = new ServerlessOfflineLocalstackSqsPlugin(serverlessInstance, options);
   });
 
-  describe('constructor', () => {
-    it('should initialize plugin with serverless instance and options', () => {
+  describe("constructor", () => {
+    it("should initialize plugin with serverless instance and options", () => {
       expect(plugin).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should define hooks', () => {
+    it("should define hooks", () => {
       expect(plugin.hooks).toBeDefined();
       // Check for common Serverless hooks - exact hook names may vary
       expect(Object.keys(plugin.hooks).length).toBeGreaterThan(0);
     });
 
-    it('should define commands', () => {
+    it("should define commands", () => {
       expect(plugin.commands).toBeDefined();
       // Commands may be defined or undefined depending on configuration
     });
   });
 
-  describe('plugin configuration', () => {
-    it('should handle missing custom configuration', () => {
+  describe("plugin configuration", () => {
+    it("should handle missing custom configuration", () => {
       const serverlessWithoutCustom = {
         ...serverlessInstance,
         service: {
@@ -112,11 +112,14 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginWithDefaults = new ServerlessOfflineLocalstackSqsPlugin(serverlessWithoutCustom, options);
+      const pluginWithDefaults = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessWithoutCustom,
+        options,
+      );
       expect(pluginWithDefaults).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle missing functions', () => {
+    it("should handle missing functions", () => {
       const serverlessWithoutFunctions = {
         ...serverlessInstance,
         service: {
@@ -125,11 +128,14 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginWithoutFunctions = new ServerlessOfflineLocalstackSqsPlugin(serverlessWithoutFunctions, options);
+      const pluginWithoutFunctions = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessWithoutFunctions,
+        options,
+      );
       expect(pluginWithoutFunctions).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle missing resources', () => {
+    it("should handle missing resources", () => {
       const serverlessWithoutResources = {
         ...serverlessInstance,
         service: {
@@ -138,19 +144,22 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginWithoutResources = new ServerlessOfflineLocalstackSqsPlugin(serverlessWithoutResources, options);
+      const pluginWithoutResources = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessWithoutResources,
+        options,
+      );
       expect(pluginWithoutResources).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
   });
 
-  describe('plugin disabled', () => {
-    it('should handle disabled plugin', () => {
+  describe("plugin disabled", () => {
+    it("should handle disabled plugin", () => {
       const serverlessDisabled = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           custom: {
-            'serverless-offline-localstack-sqs': {
+            "serverless-offline-localstack-sqs": {
               enabled: false,
             },
           },
@@ -162,15 +171,15 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
     });
   });
 
-  describe('error handling', () => {
-    it('should handle invalid configuration gracefully', () => {
+  describe("error handling", () => {
+    it("should handle invalid configuration gracefully", () => {
       const invalidServerless = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           custom: {
-            'serverless-offline-localstack-sqs': {
-              endpoint: 'invalid-url',
+            "serverless-offline-localstack-sqs": {
+              endpoint: "invalid-url",
               pollInterval: -1,
             },
           },
@@ -178,10 +187,12 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
       };
 
       // Should throw with validation error
-      expect(() => new ServerlessOfflineLocalstackSqsPlugin(invalidServerless, options)).toThrow('Invalid plugin configuration');
+      expect(() => new ServerlessOfflineLocalstackSqsPlugin(invalidServerless, options)).toThrow(
+        "Invalid plugin configuration",
+      );
     });
 
-    it('should handle missing provider configuration', () => {
+    it("should handle missing provider configuration", () => {
       const serverlessWithoutProvider = {
         ...serverlessInstance,
         service: {
@@ -190,36 +201,40 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      expect(() => new ServerlessOfflineLocalstackSqsPlugin(serverlessWithoutProvider, options)).not.toThrow();
+      expect(
+        () => new ServerlessOfflineLocalstackSqsPlugin(serverlessWithoutProvider, options),
+      ).not.toThrow();
     });
   });
 
-  describe('AWS provider validation', () => {
-    it('should handle non-AWS providers gracefully', () => {
+  describe("AWS provider validation", () => {
+    it("should handle non-AWS providers gracefully", () => {
       const nonAwsServerless = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           provider: {
-            name: 'azure',
-            region: 'us-east-1',
+            name: "azure",
+            region: "us-east-1",
           },
         },
       };
 
-      expect(() => new ServerlessOfflineLocalstackSqsPlugin(nonAwsServerless, options)).not.toThrow();
+      expect(
+        () => new ServerlessOfflineLocalstackSqsPlugin(nonAwsServerless, options),
+      ).not.toThrow();
     });
   });
 
-  describe('SQS event parsing', () => {
-    it('should handle functions with no events', () => {
+  describe("SQS event parsing", () => {
+    it("should handle functions with no events", () => {
       const serverlessNoEvents = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
             noEventsFunction: {
-              handler: 'handler.test',
+              handler: "handler.test",
               // No events property
             },
           },
@@ -230,32 +245,35 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
       expect(pluginNoEvents).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle string function definitions', () => {
+    it("should handle string function definitions", () => {
       const serverlessStringFunction = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
-            stringFunction: 'handler.test', // String instead of object
+            stringFunction: "handler.test", // String instead of object
           },
         },
       };
 
-      const pluginStringFunction = new ServerlessOfflineLocalstackSqsPlugin(serverlessStringFunction, options);
+      const pluginStringFunction = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessStringFunction,
+        options,
+      );
       expect(pluginStringFunction).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle SQS events with string ARN format', () => {
+    it("should handle SQS events with string ARN format", () => {
       const serverlessStringArn = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
             testFunction: {
-              handler: 'handler.test',
+              handler: "handler.test",
               events: [
                 {
-                  sqs: 'arn:aws:sqs:us-east-1:123456789012:test-queue-string',
+                  sqs: "arn:aws:sqs:us-east-1:123456789012:test-queue-string",
                 },
               ],
             },
@@ -263,22 +281,25 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginStringArn = new ServerlessOfflineLocalstackSqsPlugin(serverlessStringArn, options);
+      const pluginStringArn = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessStringArn,
+        options,
+      );
       expect(pluginStringArn).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle SQS events with queueName instead of arn', () => {
+    it("should handle SQS events with queueName instead of arn", () => {
       const serverlessQueueName = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
             testFunction: {
-              handler: 'handler.test',
+              handler: "handler.test",
               events: [
                 {
                   sqs: {
-                    queueName: 'test-queue-name',
+                    queueName: "test-queue-name",
                     batchSize: 5,
                   },
                 },
@@ -288,18 +309,21 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginQueueName = new ServerlessOfflineLocalstackSqsPlugin(serverlessQueueName, options);
+      const pluginQueueName = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessQueueName,
+        options,
+      );
       expect(pluginQueueName).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle invalid SQS events', () => {
+    it("should handle invalid SQS events", () => {
       const serverlessInvalidSqs = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
             testFunction: {
-              handler: 'handler.test',
+              handler: "handler.test",
               events: [
                 {
                   sqs: {
@@ -313,18 +337,21 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginInvalidSqs = new ServerlessOfflineLocalstackSqsPlugin(serverlessInvalidSqs, options);
+      const pluginInvalidSqs = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessInvalidSqs,
+        options,
+      );
       expect(pluginInvalidSqs).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle unsupported SQS event formats', () => {
+    it("should handle unsupported SQS event formats", () => {
       const serverlessUnsupportedSqs = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
             testFunction: {
-              handler: 'handler.test',
+              handler: "handler.test",
               events: [
                 {
                   sqs: 123, // Number instead of string or object
@@ -335,23 +362,26 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginUnsupportedSqs = new ServerlessOfflineLocalstackSqsPlugin(serverlessUnsupportedSqs, options);
+      const pluginUnsupportedSqs = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessUnsupportedSqs,
+        options,
+      );
       expect(pluginUnsupportedSqs).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
-    it('should handle malformed function definitions that cause parsing errors', () => {
+    it("should handle malformed function definitions that cause parsing errors", () => {
       const serverlessMalformed = {
         ...serverlessInstance,
         service: {
           ...serverlessInstance.service,
           functions: {
             testFunction: {
-              handler: 'handler.test',
+              handler: "handler.test",
               events: [
                 {
                   sqs: {
                     get arn() {
-                      throw new Error('Getter error');
+                      throw new Error("Getter error");
                     },
                   },
                 },
@@ -361,7 +391,10 @@ describe('ServerlessOfflineLocalstackSqsPlugin', () => {
         },
       };
 
-      const pluginMalformed = new ServerlessOfflineLocalstackSqsPlugin(serverlessMalformed, options);
+      const pluginMalformed = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessMalformed,
+        options,
+      );
       expect(pluginMalformed).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
   });

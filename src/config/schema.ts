@@ -1,4 +1,4 @@
-import Joi from 'joi';
+import Joi from "joi";
 
 const queueConfigSchema = Joi.object({
   queueName: Joi.string().required(),
@@ -18,16 +18,16 @@ const queueConfigSchema = Joi.object({
 export const configSchema = Joi.object({
   enabled: Joi.boolean().default(true),
   endpoint: Joi.string().uri().optional(),
-  region: Joi.string().default('us-east-1'),
-  accessKeyId: Joi.string().default('test'),
-  secretAccessKey: Joi.string().default('test'),
+  region: Joi.string().default("us-east-1"),
+  accessKeyId: Joi.string().default("test"),
+  secretAccessKey: Joi.string().default("test"),
   autoCreate: Joi.boolean().default(true),
   pollInterval: Joi.number().integer().min(100).default(1000),
   maxConcurrentPolls: Joi.number().integer().min(1).default(3),
   visibilityTimeout: Joi.number().integer().min(0).max(43200).default(30),
   waitTimeSeconds: Joi.number().integer().min(0).max(20).default(20),
   maxReceiveCount: Joi.number().integer().min(1).default(3),
-  deadLetterQueueSuffix: Joi.string().default('-dlq'),
+  deadLetterQueueSuffix: Joi.string().default("-dlq"),
   debug: Joi.boolean().default(false),
   skipCacheInvalidation: Joi.boolean().default(false),
   // lambdaTimeout is in milliseconds (e.g., 30000 = 30 seconds)
@@ -42,7 +42,9 @@ export const validateConfig = (config: any) => {
   });
 
   if (error) {
-    throw new Error(`Invalid plugin configuration: ${error.details.map(d => d.message).join(', ')}`);
+    throw new Error(
+      `Invalid plugin configuration: ${error.details.map((d) => d.message).join(", ")}`,
+    );
   }
 
   return value;

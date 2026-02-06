@@ -1,4 +1,4 @@
-import { Message } from '@aws-sdk/client-sqs';
+import { Message } from "@aws-sdk/client-sqs";
 
 export interface SQSRecord {
   messageId: string;
@@ -38,7 +38,7 @@ export class EventBuilder {
   private region: string;
   private accountId: string;
 
-  constructor(region: string, accountId = '000000000000') {
+  constructor(region: string, accountId = "000000000000") {
     this.region = region;
     this.accountId = accountId;
   }
@@ -49,16 +49,19 @@ export class EventBuilder {
       receiptHandle: message.ReceiptHandle!,
       body: message.Body!,
       attributes: {
-        ApproximateReceiveCount: message.Attributes?.ApproximateReceiveCount || '1',
+        ApproximateReceiveCount: message.Attributes?.ApproximateReceiveCount || "1",
         SentTimestamp: message.Attributes?.SentTimestamp || Date.now().toString(),
-        SenderId: message.Attributes?.SenderId || 'AIDAIENQZJOLO23YVJ4VO',
-        ApproximateFirstReceiveTimestamp: message.Attributes?.ApproximateFirstReceiveTimestamp || Date.now().toString(),
+        SenderId: message.Attributes?.SenderId || "AIDAIENQZJOLO23YVJ4VO",
+        ApproximateFirstReceiveTimestamp:
+          message.Attributes?.ApproximateFirstReceiveTimestamp || Date.now().toString(),
         ...message.Attributes,
       },
       messageAttributes: this.formatMessageAttributes(message.MessageAttributes || {}),
       md5OfBody: message.MD5OfBody || this.calculateMD5(message.Body!),
-      ...(message.MD5OfMessageAttributes ? { md5OfMessageAttributes: message.MD5OfMessageAttributes } : {}),
-      eventSource: 'aws:sqs',
+      ...(message.MD5OfMessageAttributes
+        ? { md5OfMessageAttributes: message.MD5OfMessageAttributes }
+        : {}),
+      eventSource: "aws:sqs",
       eventSourceARN: this.buildQueueArn(queueName),
       awsRegion: this.region,
     }));
@@ -73,12 +76,12 @@ export class EventBuilder {
     return {
       callbackWaitsForEmptyEventLoop: true,
       functionName,
-      functionVersion: '$LATEST',
+      functionVersion: "$LATEST",
       invokedFunctionArn: `arn:aws:lambda:${this.region}:${this.accountId}:function:${functionName}`,
-      memoryLimitInMB: '1024',
+      memoryLimitInMB: "1024",
       awsRequestId: requestId,
       logGroupName: `/aws/lambda/${functionName}`,
-      logStreamName: `${new Date().toISOString().split('T')[0].replace(/-/g, '/')}/[$LATEST]${this.generateLogStreamSuffix()}`,
+      logStreamName: `${new Date().toISOString().split("T")[0].replace(/-/g, "/")}/[$LATEST]${this.generateLogStreamSuffix()}`,
       getRemainingTimeInMillis: () => Math.max(0, timeout - (Date.now() - startTime)),
       done: (error?: Error, result?: any) => {
         if (error) throw error;
@@ -93,20 +96,20 @@ export class EventBuilder {
 
   private formatMessageAttributes(attributes: Record<string, any>): Record<string, any> {
     const formatted: Record<string, any> = {};
-    
+
     for (const [key, value] of Object.entries(attributes)) {
-      if (value && typeof value === 'object') {
+      if (value && typeof value === "object") {
         formatted[key] = {
           stringValue: value.StringValue,
           binaryValue: value.BinaryValue,
           stringListValues: value.StringListValues,
           binaryListValues: value.BinaryListValues,
-          dataType: value.DataType || 'String',
+          dataType: value.DataType || "String",
         };
       } else {
         formatted[key] = {
           stringValue: String(value),
-          dataType: 'String',
+          dataType: "String",
         };
       }
     }
@@ -120,22 +123,22 @@ export class EventBuilder {
 
   private calculateMD5(body: string): string {
     // Simple MD5 placeholder - in a real implementation, you'd use crypto
-     
-    const crypto = require('crypto');
-    return crypto.createHash('md5').update(body).digest('hex');
+
+    const crypto = require("crypto");
+    return crypto.createHash("md5").update(body).digest("hex");
   }
 
   private generateRequestId(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
   }
 
   private generateLogStreamSuffix(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
     for (let i = 0; i < 32; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }

@@ -9,9 +9,9 @@ import {
   DeleteMessageBatchCommand,
   SendMessageCommand,
   Message,
-} from '@aws-sdk/client-sqs';
-import { Logger } from '../utils/logger';
-import { PluginConfig } from '../config/defaults';
+} from "@aws-sdk/client-sqs";
+import { Logger } from "../utils/logger";
+import { PluginConfig } from "../config/defaults";
 
 export interface QueueInfo {
   queueUrl: string;
@@ -27,7 +27,7 @@ export class SqsClientWrapper {
   constructor(config: PluginConfig, logger: Logger, endpoint?: string) {
     this.config = config;
     this.logger = logger;
-    
+
     const clientConfig: any = {
       region: config.region,
       credentials: {
@@ -42,33 +42,33 @@ export class SqsClientWrapper {
     }
 
     this.client = new SQSClient(clientConfig);
-    this.logger.debug(`SQS Client initialized with endpoint: ${endpoint || 'default'}`);
+    this.logger.debug(`SQS Client initialized with endpoint: ${endpoint || "default"}`);
   }
 
   async createQueue(queueName: string, attributes?: Record<string, string>): Promise<QueueInfo> {
     try {
       this.logger.debug(`Creating queue: ${queueName}`);
-      
+
       const command = new CreateQueueCommand({
         QueueName: queueName,
         Attributes: attributes,
       });
 
       const response = await this.client.send(command);
-      
+
       if (!response.QueueUrl) {
         throw new Error(`Failed to create queue ${queueName}: No queue URL returned`);
       }
 
       this.logger.info(`Created queue: ${queueName} at ${response.QueueUrl}`);
-      
+
       return {
         queueUrl: response.QueueUrl,
         queueName,
         attributes,
       };
     } catch (error: any) {
-      if (error.name === 'QueueAlreadyExists') {
+      if (error.name === "QueueAlreadyExists") {
         this.logger.debug(`Queue ${queueName} already exists, getting URL`);
         return this.getQueueInfo(queueName);
       }
@@ -80,16 +80,16 @@ export class SqsClientWrapper {
     try {
       const urlCommand = new GetQueueUrlCommand({ QueueName: queueName });
       const urlResponse = await this.client.send(urlCommand);
-      
+
       if (!urlResponse.QueueUrl) {
         throw new Error(`Queue ${queueName} not found`);
       }
 
       const attrsCommand = new GetQueueAttributesCommand({
         QueueUrl: urlResponse.QueueUrl,
-        AttributeNames: ['All'],
+        AttributeNames: ["All"],
       });
-      
+
       const attrsResponse = await this.client.send(attrsCommand);
 
       return {
@@ -120,7 +120,7 @@ export class SqsClientWrapper {
     queueUrl: string,
     maxMessages = 1,
     visibilityTimeout = 30,
-    waitTimeSeconds = 20
+    waitTimeSeconds = 20,
   ): Promise<Message[]> {
     try {
       const command = new ReceiveMessageCommand({
@@ -128,8 +128,8 @@ export class SqsClientWrapper {
         MaxNumberOfMessages: maxMessages,
         VisibilityTimeout: visibilityTimeout,
         WaitTimeSeconds: waitTimeSeconds,
-        AttributeNames: ['All'],
-        MessageAttributeNames: ['All'],
+        AttributeNames: ["All"],
+        MessageAttributeNames: ["All"],
       });
 
       const response = await this.client.send(command);
@@ -170,7 +170,7 @@ export class SqsClientWrapper {
       });
 
       const response = await this.client.send(command);
-      
+
       if (response.Failed && response.Failed.length > 0) {
         this.logger.warn(`Failed to delete ${response.Failed.length} messages`);
       }
@@ -182,7 +182,11 @@ export class SqsClientWrapper {
     }
   }
 
-  async sendMessage(queueUrl: string, messageBody: string, attributes?: Record<string, any>): Promise<void> {
+  async sendMessage(
+    queueUrl: string,
+    messageBody: string,
+    attributes?: Record<string, any>,
+  ): Promise<void> {
     try {
       const command = new SendMessageCommand({
         QueueUrl: queueUrl,

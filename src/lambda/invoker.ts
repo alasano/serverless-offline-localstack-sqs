@@ -1,8 +1,8 @@
-import { resolve } from 'path';
-import { existsSync } from 'fs';
-import { EventBuilder, SQSEvent, LambdaContext } from './event-builder';
-import { Logger } from '../utils/logger';
-import { PluginConfig } from '../config/defaults';
+import { resolve } from "path";
+import { existsSync } from "fs";
+import { EventBuilder, SQSEvent, LambdaContext } from "./event-builder";
+import { Logger } from "../utils/logger";
+import { PluginConfig } from "../config/defaults";
 
 export interface HandlerResult {
   success: boolean;
@@ -33,20 +33,19 @@ export class LambdaInvoker {
   async invokeHandler(
     handlerPath: string,
     sqsEvent: SQSEvent,
-    functionDefinition: FunctionDefinition
+    functionDefinition: FunctionDefinition,
   ): Promise<HandlerResult> {
     try {
-      this.logger.debug(`Invoking handler: ${handlerPath} with ${sqsEvent.Records.length} message(s)`);
+      this.logger.debug(
+        `Invoking handler: ${handlerPath} with ${sqsEvent.Records.length} message(s)`,
+      );
 
       const handler = await this.loadHandler(handlerPath);
       // Serverless Framework defines timeout in seconds; convert to ms for internal use
       const timeout = functionDefinition.timeout
         ? functionDefinition.timeout * 1000
         : this.config.lambdaTimeout;
-      const context = this.eventBuilder.buildLambdaContext(
-        handlerPath,
-        timeout
-      );
+      const context = this.eventBuilder.buildLambdaContext(handlerPath, timeout);
 
       const startTime = Date.now();
       let result: any;
@@ -55,7 +54,7 @@ export class LambdaInvoker {
         // Handle both callback and promise-based handlers
         result = await this.executeHandler(handler, sqsEvent, context);
         const duration = Date.now() - startTime;
-        
+
         this.logger.info(`Handler ${handlerPath} completed successfully in ${duration}ms`);
         return { success: true, result };
       } catch (error: any) {
@@ -96,12 +95,11 @@ export class LambdaInvoker {
     try {
       // Clear require cache to enable hot reloading
       delete require.cache[require.resolve(fullPath)];
-      
-       
+
       const module = require(fullPath);
       const handler = module[handlerName];
 
-      if (typeof handler !== 'function') {
+      if (typeof handler !== "function") {
         throw new Error(`Handler ${handlerName} is not a function in ${fullPath}`);
       }
 
@@ -112,11 +110,16 @@ export class LambdaInvoker {
     }
   }
 
-  private parseHandlerPath(handlerPath: string): { modulePath: string; handlerName: string } {
-    const lastDotIndex = handlerPath.lastIndexOf('.');
-    
+  private parseHandlerPath(handlerPath: string): {
+    modulePath: string;
+    handlerName: string;
+  } {
+    const lastDotIndex = handlerPath.lastIndexOf(".");
+
     if (lastDotIndex === -1) {
-      throw new Error(`Invalid handler format: ${handlerPath}. Expected format: 'file.handlerName'`);
+      throw new Error(
+        `Invalid handler format: ${handlerPath}. Expected format: 'file.handlerName'`,
+      );
     }
 
     const modulePath = handlerPath.substring(0, lastDotIndex);
@@ -138,10 +141,10 @@ export class LambdaInvoker {
     if (!basePath.startsWith(this.servicePath)) {
       throw new Error(`Handler path "${modulePath}" resolves outside the service directory`);
     }
-    
+
     // Try different extensions
-    const extensions = ['.js', '.ts', '.mjs'];
-    
+    const extensions = [".js", ".ts", ".mjs"];
+
     for (const ext of extensions) {
       const fullPath = basePath + ext;
       if (existsSync(fullPath)) {
@@ -151,17 +154,21 @@ export class LambdaInvoker {
 
     // Try as directory with index file
     for (const ext of extensions) {
-      const indexPath = resolve(basePath, 'index' + ext);
+      const indexPath = resolve(basePath, "index" + ext);
       if (existsSync(indexPath)) {
         return indexPath;
       }
     }
 
     // Return the original path and let the error be handled upstream
-    return basePath + '.js';
+    return basePath + ".js";
   }
 
-  private async executeHandler(handler: any, event: SQSEvent, context: LambdaContext): Promise<any> {
+  private async executeHandler(
+    handler: any,
+    event: SQSEvent,
+    context: LambdaContext,
+  ): Promise<any> {
     return new Promise((resolve, reject) => {
       let isResolved = false;
 
@@ -179,7 +186,11 @@ export class LambdaInvoker {
         if (!isResolved) {
           isResolved = true;
           clearTimeout(timeout);
-          if (error) { reject(error); } else { resolve(result); }
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
         }
       };
 
@@ -205,12 +216,16 @@ export class LambdaInvoker {
           if (!isResolved) {
             isResolved = true;
             clearTimeout(timeout);
-            if (error) { reject(error); } else { resolve(response); }
+            if (error) {
+              reject(error);
+            } else {
+              resolve(response);
+            }
           }
         });
 
         // Handle promise-based handlers
-        if (result && typeof result.then === 'function') {
+        if (result && typeof result.then === "function") {
           result
             .then((response: any) => {
               if (!isResolved) {
@@ -240,7 +255,7 @@ export class LambdaInvoker {
   private invalidateRequireCache(handlerPath: string): void {
     const { modulePath } = this.parseHandlerPath(handlerPath);
     const fullPath = this.resolveHandlerPath(modulePath);
-    
+
     if (require.cache[require.resolve(fullPath)]) {
       delete require.cache[require.resolve(fullPath)];
     }
@@ -248,6 +263,6 @@ export class LambdaInvoker {
 
   clearCache(): void {
     this.handlerCache.clear();
-    this.logger.debug('Handler cache cleared');
+    this.logger.debug("Handler cache cleared");
   }
 }

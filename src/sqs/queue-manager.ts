@@ -1,6 +1,6 @@
-import { SqsClientWrapper, QueueInfo } from './client';
-import { Logger } from '../utils/logger';
-import { PluginConfig, QueueConfig } from '../config/defaults';
+import { SqsClientWrapper, QueueInfo } from "./client";
+import { Logger } from "../utils/logger";
+import { PluginConfig, QueueConfig } from "../config/defaults";
 
 export interface QueueResource {
   logicalId: string;
@@ -23,11 +23,11 @@ export class QueueManager {
 
   async createQueuesFromConfig(): Promise<void> {
     if (!this.config.autoCreate) {
-      this.logger.debug('Queue auto-creation disabled');
+      this.logger.debug("Queue auto-creation disabled");
       return;
     }
 
-    this.logger.info('Creating queues from configuration...');
+    this.logger.info("Creating queues from configuration...");
 
     for (const queueConfig of this.config.queues) {
       try {
@@ -40,13 +40,13 @@ export class QueueManager {
 
   async createQueuesFromCloudFormation(resources: any): Promise<void> {
     if (!this.config.autoCreate) {
-      this.logger.debug('Queue auto-creation disabled');
+      this.logger.debug("Queue auto-creation disabled");
       return;
     }
 
     const sqsResources = this.extractSqsResources(resources);
     if (sqsResources.length === 0) {
-      this.logger.debug('No SQS queues found in CloudFormation resources');
+      this.logger.debug("No SQS queues found in CloudFormation resources");
       return;
     }
 
@@ -68,7 +68,9 @@ export class QueueManager {
     // Create DLQ first if enabled
     let dlqUrl: string | undefined;
     if (dlq?.enabled) {
-      const dlqName = this.sanitizeQueueName(dlq.queueName || `${queueName}${this.config.deadLetterQueueSuffix}`);
+      const dlqName = this.sanitizeQueueName(
+        dlq.queueName || `${queueName}${this.config.deadLetterQueueSuffix}`,
+      );
       const dlqInfo = await this.sqsClient.createQueue(dlqName);
       dlqUrl = dlqInfo.queueUrl;
       this.createdQueues.set(dlqName, dlqInfo);
@@ -111,12 +113,18 @@ export class QueueManager {
 
   private buildQueueAttributes(queueConfig: QueueConfig, dlqUrl?: string): Record<string, string> {
     const attributes: Record<string, string> = {
-      VisibilityTimeout: (queueConfig.visibilityTimeout || this.config.visibilityTimeout).toString(),
-      ReceiveMessageWaitTimeSeconds: (queueConfig.waitTimeSeconds || this.config.waitTimeSeconds).toString(),
+      VisibilityTimeout: (
+        queueConfig.visibilityTimeout || this.config.visibilityTimeout
+      ).toString(),
+      ReceiveMessageWaitTimeSeconds: (
+        queueConfig.waitTimeSeconds || this.config.waitTimeSeconds
+      ).toString(),
     };
 
     if (dlqUrl && queueConfig.dlq?.enabled) {
-      const dlqName = this.sanitizeQueueName(queueConfig.dlq.queueName || `${queueConfig.queueName}${this.config.deadLetterQueueSuffix}`);
+      const dlqName = this.sanitizeQueueName(
+        queueConfig.dlq.queueName || `${queueConfig.queueName}${this.config.deadLetterQueueSuffix}`,
+      );
       attributes.RedrivePolicy = JSON.stringify({
         deadLetterTargetArn: this.buildQueueArn(dlqName),
         maxReceiveCount: queueConfig.dlq.maxReceiveCount || this.config.maxReceiveCount,
@@ -129,7 +137,7 @@ export class QueueManager {
   private extractSqsResources(resources: any): QueueResource[] {
     const sqsResources: QueueResource[] = [];
 
-    if (!resources || typeof resources !== 'object') {
+    if (!resources || typeof resources !== "object") {
       return sqsResources;
     }
 
@@ -146,7 +154,7 @@ export class QueueManager {
   }
 
   private isSqsQueue(resource: any): boolean {
-    return resource?.Type === 'AWS::SQS::Queue';
+    return resource?.Type === "AWS::SQS::Queue";
   }
 
   private parseQueueResource(logicalId: string, resource: any): QueueResource | null {
@@ -160,7 +168,8 @@ export class QueueManager {
         attributes.VisibilityTimeout = properties.VisibilityTimeout.toString();
       }
       if (properties.ReceiveMessageWaitTimeSeconds !== undefined) {
-        attributes.ReceiveMessageWaitTimeSeconds = properties.ReceiveMessageWaitTimeSeconds.toString();
+        attributes.ReceiveMessageWaitTimeSeconds =
+          properties.ReceiveMessageWaitTimeSeconds.toString();
       }
       if (properties.MessageRetentionPeriod !== undefined) {
         attributes.MessageRetentionPeriod = properties.MessageRetentionPeriod.toString();
@@ -187,10 +196,13 @@ export class QueueManager {
       let dlqName: string | undefined;
       if (properties.RedrivePolicy) {
         attributes.RedrivePolicy = JSON.stringify(properties.RedrivePolicy);
-        
+
         // Try to extract DLQ name from the policy
-        if (properties.RedrivePolicy.deadLetterTargetArn && typeof properties.RedrivePolicy.deadLetterTargetArn === 'string') {
-          const arnParts = properties.RedrivePolicy.deadLetterTargetArn.split(':');
+        if (
+          properties.RedrivePolicy.deadLetterTargetArn &&
+          typeof properties.RedrivePolicy.deadLetterTargetArn === "string"
+        ) {
+          const arnParts = properties.RedrivePolicy.deadLetterTargetArn.split(":");
           dlqName = this.sanitizeQueueName(arnParts[arnParts.length - 1]);
         }
       }
@@ -214,12 +226,12 @@ export class QueueManager {
 
   private sanitizeQueueName(queueName: string): string {
     // Detect and preserve .fifo suffix — FIFO queues must end with .fifo
-    const isFifo = queueName.endsWith('.fifo');
+    const isFifo = queueName.endsWith(".fifo");
     const baseName = isFifo ? queueName.slice(0, -5) : queueName;
 
     // SQS queue names can only contain alphanumeric characters, hyphens, and underscores
     // Replace dots and other invalid characters with hyphens
-    let sanitized = baseName.replace(/[^a-zA-Z0-9_-]/g, '-');
+    let sanitized = baseName.replace(/[^a-zA-Z0-9_-]/g, "-");
 
     // Ensure length is between 1 and 80 characters
     // For FIFO queues, the .fifo suffix takes 5 chars, so base name max is 75
@@ -229,16 +241,16 @@ export class QueueManager {
     }
 
     // Remove trailing hyphens that might have been added
-    sanitized = sanitized.replace(/-+$/, '');
+    sanitized = sanitized.replace(/-+$/, "");
 
     // Ensure we don't have an empty string
     if (sanitized.length === 0) {
-      sanitized = 'queue';
+      sanitized = "queue";
     }
 
     // Re-append .fifo suffix if originally present
     if (isFifo) {
-      sanitized += '.fifo';
+      sanitized += ".fifo";
     }
 
     return sanitized;
