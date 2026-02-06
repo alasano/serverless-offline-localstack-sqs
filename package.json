@@ -1,6 +1,6 @@
 {
-  "name": "serverless-offline-localstack-sqs",
-  "version": "1.0.2",
+  "name": "@alasano/serverless-offline-localstack-sqs",
+  "version": "1.0.0",
   "description": "Serverless Framework plugin for offline LocalStack SQS integration with local Lambda handlers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,7 +23,7 @@
     "aws",
     "plugin"
   ],
-  "author": "Your Name",
+  "author": "Aljosa Asanovic",
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
@@ -57,12 +57,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/civocr/serverless-offline-localstack-sqs.git"
+    "url": "https://github.com/alasano/serverless-offline-localstack-sqs.git"
   },
   "bugs": {
-    "url": "https://github.com/civocr/serverless-offline-localstack-sqs/issues"
+    "url": "https://github.com/alasano/serverless-offline-localstack-sqs/issues"
   },
-  "homepage": "https://github.com/civocr/serverless-offline-localstack-sqs#readme",
+  "homepage": "https://github.com/alasano/serverless-offline-localstack-sqs#readme",
   "lint-staged": {
     "*.{ts,js,mjs,json,md}": [
       "prettier --write"
