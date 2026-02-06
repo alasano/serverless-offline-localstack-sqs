@@ -73,11 +73,14 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
     this.serverless = serverless;
     this.options = options;
 
-    // Initialize logger first
+    // Initialize logger first (temporary, without debug flag)
     this.logger = createLogger("[serverless-offline-localstack-sqs]");
 
     // Initialize configuration
     this.config = this.initializeConfig();
+
+    // Re-initialize logger with debug flag from config
+    this.logger = createLogger("[serverless-offline-localstack-sqs]", this.config.debug);
 
     // Set up plugin lifecycle hooks
     this.hooks = {
