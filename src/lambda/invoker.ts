@@ -39,9 +39,13 @@ export class LambdaInvoker {
       this.logger.debug(`Invoking handler: ${handlerPath} with ${sqsEvent.Records.length} message(s)`);
 
       const handler = await this.loadHandler(handlerPath);
+      // Serverless Framework defines timeout in seconds; convert to ms for internal use
+      const timeout = functionDefinition.timeout
+        ? functionDefinition.timeout * 1000
+        : this.config.lambdaTimeout;
       const context = this.eventBuilder.buildLambdaContext(
         handlerPath,
-        functionDefinition.timeout || this.config.lambdaTimeout
+        timeout
       );
 
       const startTime = Date.now();

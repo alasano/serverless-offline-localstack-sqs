@@ -30,6 +30,7 @@ export const configSchema = Joi.object({
   deadLetterQueueSuffix: Joi.string().default('-dlq'),
   debug: Joi.boolean().default(false),
   skipCacheInvalidation: Joi.boolean().default(false),
+  // lambdaTimeout is in milliseconds (e.g., 30000 = 30 seconds)
   lambdaTimeout: Joi.number().integer().min(1000).max(900000).default(30000),
   queues: Joi.array().items(queueConfigSchema).default([]),
 });
