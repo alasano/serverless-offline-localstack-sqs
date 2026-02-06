@@ -96,21 +96,29 @@ describe('QueueManager - Webhook Configuration', () => {
       await expect(queueManager.createQueuesFromCloudFormation(cloudFormationResources))
         .resolves.not.toThrow();
 
-      // Verify that queues were created with sanitized names (dots replaced with hyphens)
+      // Verify that queues were created with .fifo suffix preserved
       expect(mockSqsClient.createQueue).toHaveBeenCalledWith(
-        'wetrained-webhook-events-local-fifo',
+        'wetrained-webhook-events-local.fifo',
         expect.objectContaining({
           VisibilityTimeout: '300',
           ReceiveMessageWaitTimeSeconds: '20',
-          MessageRetentionPeriod: '1209600'
+          MessageRetentionPeriod: '1209600',
+          FifoQueue: 'true',
+          ContentBasedDeduplication: 'false',
+          DeduplicationScope: 'queue',
+          FifoThroughputLimit: 'perQueue'
         })
       );
 
       expect(mockSqsClient.createQueue).toHaveBeenCalledWith(
-        'wetrained-webhook-events-dlq-local-fifo',
+        'wetrained-webhook-events-dlq-local.fifo',
         expect.objectContaining({
           VisibilityTimeout: '300',
-          MessageRetentionPeriod: '1209600'
+          MessageRetentionPeriod: '1209600',
+          FifoQueue: 'true',
+          ContentBasedDeduplication: 'false',
+          DeduplicationScope: 'queue',
+          FifoThroughputLimit: 'perQueue'
         })
       );
 
@@ -148,7 +156,7 @@ describe('QueueManager - Webhook Configuration', () => {
       const testCases = [
         {
           input: 'wetrained-webhook-events-local.fifo',
-          expected: 'wetrained-webhook-events-local-fifo'
+          expected: 'wetrained-webhook-events-local.fifo'
         },
         {
           input: 'queue.with.dots.and@symbols!',

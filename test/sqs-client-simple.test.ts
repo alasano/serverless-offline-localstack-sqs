@@ -147,9 +147,8 @@ describe('SqsClientWrapper', () => {
       const error = new Error('Receive error');
       mockSQSClient.send.mockRejectedValue(error);
 
-      const result = await sqsClient.receiveMessages('http://localhost:4566/000000000000/test-queue');
-
-      expect(result).toEqual([]);
+      await expect(sqsClient.receiveMessages('http://localhost:4566/000000000000/test-queue'))
+        .rejects.toThrow('Receive error');
       expect(mockLogger.error).toHaveBeenCalledWith('Failed to receive messages from http://localhost:4566/000000000000/test-queue: Receive error');
     });
   });
