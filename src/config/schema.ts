@@ -9,6 +9,9 @@ const queueConfigSchema = Joi.object({
   visibilityTimeout: Joi.number().integer().min(0).max(43200).default(30),
   waitTimeSeconds: Joi.number().integer().min(0).max(20).default(20),
   timeout: Joi.number().integer().min(1).max(900).optional(), // Lambda timeout in seconds
+  functionResponseTypes: Joi.array()
+    .items(Joi.string().valid("ReportBatchItemFailures"))
+    .optional(),
   dlq: Joi.object({
     enabled: Joi.boolean().required(),
     maxReceiveCount: Joi.number().integer().min(1).default(3),

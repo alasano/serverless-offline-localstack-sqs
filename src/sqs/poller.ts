@@ -186,19 +186,28 @@ export class MessagePoller {
       );
 
       if (result.success) {
-        // Delete all messages in the batch on success
-        const receiptHandles: string[] = [];
-        for (const message of messages) {
-          if (!message.ReceiptHandle) {
-            this.logger.warn(`Message ${message.MessageId} missing ReceiptHandle, skipping delete`);
-            continue;
+        const hasReportBatchItemFailures =
+          queueConfig.functionResponseTypes?.includes("ReportBatchItemFailures") ?? false;
+
+        if (hasReportBatchItemFailures) {
+          await this.handlePartialBatchResponse(result, messages, queueConfig, queueInfo);
+        } else {
+          // Default all-or-nothing behavior: delete all messages on success
+          const receiptHandles: string[] = [];
+          for (const message of messages) {
+            if (!message.ReceiptHandle) {
+              this.logger.warn(
+                `Message ${message.MessageId} missing ReceiptHandle, skipping delete`,
+              );
+              continue;
+            }
+            receiptHandles.push(message.ReceiptHandle);
           }
-          receiptHandles.push(message.ReceiptHandle);
+          await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
+          this.logger.debug(
+            `Successfully processed batch of ${messages.length} message(s) [${messageIds}] from queue: ${queueName}`,
+          );
         }
-        await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
-        this.logger.debug(
-          `Successfully processed batch of ${messages.length} message(s) [${messageIds}] from queue: ${queueName}`,
-        );
       } else {
         // On failure, all messages in the batch fail together (AWS synchronous invocation behavior)
         for (const message of messages) {
@@ -211,6 +220,82 @@ export class MessagePoller {
         await this.handleMessageFailure(message, queueConfig, queueInfo, error);
       }
     }
+  }
+
+  private async handlePartialBatchResponse(
+    result: HandlerResult,
+    messages: Message[],
+    queueConfig: QueueConfig,
+    queueInfo: QueueInfo,
+  ): Promise<void> {
+    const { queueName } = queueConfig;
+    const batchItemFailures: Array<{ itemIdentifier: string }> | undefined =
+      result.result?.batchItemFailures;
+
+    // If batchItemFailures is empty, null, or undefined, treat as full success (delete all)
+    if (!batchItemFailures || batchItemFailures.length === 0) {
+      const receiptHandles: string[] = [];
+      for (const message of messages) {
+        if (!message.ReceiptHandle) {
+          this.logger.warn(`Message ${message.MessageId} missing ReceiptHandle, skipping delete`);
+          continue;
+        }
+        receiptHandles.push(message.ReceiptHandle);
+      }
+      await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
+      this.logger.debug(
+        `ReportBatchItemFailures: all ${messages.length} message(s) succeeded in queue: ${queueName}`,
+      );
+      return;
+    }
+
+    // Extract failed message IDs
+    const failedIds = new Set(batchItemFailures.map((f) => f.itemIdentifier));
+
+    // Note: This is stricter than AWS (which ignores unrecognized IDs) to catch bugs earlier in local dev.
+    const batchMessageIds = new Set(messages.map((m) => m.MessageId));
+    const unrecognizedIds = [...failedIds].filter((id) => !batchMessageIds.has(id));
+    if (unrecognizedIds.length > 0) {
+      this.logger.warn(
+        `ReportBatchItemFailures: unrecognized itemIdentifier(s) [${unrecognizedIds.join(", ")}] in queue ${queueName}. ` +
+          `Treating entire batch as failed. (Note: This is stricter than AWS, which ignores unrecognized IDs, to catch bugs earlier in local dev.)`,
+      );
+      for (const message of messages) {
+        await this.handleMessageFailure(
+          message,
+          queueConfig,
+          queueInfo,
+          new Error("Unrecognized itemIdentifier in batchItemFailures response"),
+        );
+      }
+      return;
+    }
+
+    // Split messages into succeeded and failed
+    const succeededMessages = messages.filter((m) => !failedIds.has(m.MessageId!));
+    const failedMessages = messages.filter((m) => failedIds.has(m.MessageId!));
+
+    // Delete only succeeded messages
+    if (succeededMessages.length > 0) {
+      const receiptHandles: string[] = [];
+      for (const message of succeededMessages) {
+        if (!message.ReceiptHandle) {
+          this.logger.warn(`Message ${message.MessageId} missing ReceiptHandle, skipping delete`);
+          continue;
+        }
+        receiptHandles.push(message.ReceiptHandle);
+      }
+      await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
+    }
+
+    // Send failed messages to failure handler
+    for (const message of failedMessages) {
+      await this.handleMessageFailure(message, queueConfig, queueInfo);
+    }
+
+    this.logger.debug(
+      `ReportBatchItemFailures: ${succeededMessages.length} succeeded, ${failedMessages.length} failed in queue: ${queueName}`,
+    );
   }
 
   private async handleMessageFailure(

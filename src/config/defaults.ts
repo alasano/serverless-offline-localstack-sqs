@@ -27,6 +27,7 @@ export interface QueueConfig {
   waitTimeSeconds?: number;
   /** Per-function Lambda timeout in seconds (from serverless.yml function definition) */
   timeout?: number;
+  functionResponseTypes?: string[];
   dlq?: {
     enabled: boolean;
     maxReceiveCount?: number;

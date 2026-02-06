@@ -103,6 +103,8 @@ custom:
         visibilityTimeout: 60
         waitTimeSeconds: 20
         timeout: 30 # Optional: Lambda timeout in seconds (overrides lambdaTimeout)
+        functionResponseTypes: # Optional: Enable partial batch responses
+          - ReportBatchItemFailures
         dlq:
           enabled: true
           maxReceiveCount: 5
@@ -121,6 +123,7 @@ functions:
       - sqs:
           arn: arn:aws:sqs:us-east-1:000000000000:my-queue
           batchSize: 10
+          functionResponseType: ReportBatchItemFailures # Enable partial batch responses
       - sqs:
           queueName: another-queue
           batchSize: 1
@@ -184,6 +187,35 @@ exports.main = async (event, context) => {
   }
 };
 ```
+
+### Partial Batch Responses (ReportBatchItemFailures)
+
+When `functionResponseType: ReportBatchItemFailures` is enabled, your handler can report which specific messages failed instead of failing the entire batch:
+
+```javascript
+// handlers/processor.js
+exports.main = async (event, context) => {
+  const batchItemFailures = [];
+
+  for (const record of event.Records) {
+    try {
+      const messageBody = JSON.parse(record.body);
+      await processMessage(messageBody);
+      // Message succeeded - no action needed
+    } catch (error) {
+      console.error(`Message ${record.messageId} failed:`, error);
+      // Mark this specific message as failed
+      batchItemFailures.push({ itemIdentifier: record.messageId });
+    }
+  }
+
+  // Return partial batch response
+  // Only failed messages will be retried; successful ones are deleted
+  return { batchItemFailures };
+};
+```
+
+**Note:** When `batchItemFailures` is empty or not returned, all messages are treated as successful.
 
 ### Sending Test Messages
 

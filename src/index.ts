@@ -223,6 +223,19 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
         return null;
       }
 
+      // Support both singular and plural forms for functionResponseType(s)
+      // Singular: functionResponseType: "ReportBatchItemFailures" (string)
+      // Plural: functionResponseTypes: ["ReportBatchItemFailures"] (array)
+      let functionResponseTypes: string[] | undefined;
+      if (sqsEvent.functionResponseTypes && Array.isArray(sqsEvent.functionResponseTypes)) {
+        functionResponseTypes = sqsEvent.functionResponseTypes;
+      } else if (
+        sqsEvent.functionResponseType &&
+        typeof sqsEvent.functionResponseType === "string"
+      ) {
+        functionResponseTypes = [sqsEvent.functionResponseType];
+      }
+
       return {
         queueName,
         handler: functionDef.handler,
@@ -230,6 +243,7 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
         enabled: true,
         // Serverless Framework timeout is in seconds (e.g., timeout: 30 means 30s)
         ...(functionDef.timeout != null ? { timeout: functionDef.timeout } : {}),
+        ...(functionResponseTypes ? { functionResponseTypes } : {}),
       };
     } catch (error: any) {
       this.logger.warn(`Failed to parse SQS event for function ${functionName}: ${error.message}`);
