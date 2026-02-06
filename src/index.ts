@@ -92,7 +92,7 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
       "after:offline:start": this.cleanup.bind(this),
       "offline:start:init": this.initialize.bind(this),
       "offline:start": this.start.bind(this),
-      "offline:start:ready": this.start.bind(this),
+      "before:offline:start:ready": this.start.bind(this),
       "offline:start:end": this.cleanup.bind(this),
     };
 
