@@ -73,10 +73,14 @@ export class LambdaInvoker {
     // Check cache first
     if (this.handlerCache.has(handlerPath)) {
       if (!this.config.skipCacheInvalidation) {
-        // Invalidate require cache for hot reloading
-        this.invalidateRequireCache(handlerPath);
+        this.handlerCache.delete(handlerPath);
+        try {
+          this.invalidateRequireCache(handlerPath);
+        } catch (e) {
+          this.logger.debug(`Cache invalidation failed for ${handlerPath}: ${e}`);
+        }
       } else {
-        return this.handlerCache.get(handlerPath);
+        return this.handlerCache.get(handlerPath)!;
       }
     }
 
@@ -129,6 +133,11 @@ export class LambdaInvoker {
 
     // Handle relative paths
     const basePath = resolve(this.servicePath, modulePath);
+
+    // Prevent path traversal outside the service directory
+    if (!basePath.startsWith(this.servicePath)) {
+      throw new Error(`Handler path "${modulePath}" resolves outside the service directory`);
+    }
     
     // Try different extensions
     const extensions = ['.js', '.ts', '.mjs'];
