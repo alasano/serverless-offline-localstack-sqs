@@ -37,9 +37,9 @@
     "joi": "^17.11.0"
   },
   "devDependencies": {
-    "@types/dockerode": "^3.3.23",
+    "@types/dockerode": "^4.0.1",
     "@types/jest": "^29.5.8",
-    "@types/node": "^20.10.0",
+    "@types/node": "^25.2.1",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.54.0",
