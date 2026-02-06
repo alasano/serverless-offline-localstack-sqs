@@ -227,6 +227,8 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
         handler: functionDef.handler,
         batchSize,
         enabled: true,
+        // Serverless Framework timeout is in seconds (e.g., timeout: 30 means 30s)
+        ...(functionDef.timeout != null ? { timeout: functionDef.timeout } : {}),
       };
     } catch (error: any) {
       this.logger.warn(`Failed to parse SQS event for function ${functionName}: ${error.message}`);

@@ -8,6 +8,7 @@ const queueConfigSchema = Joi.object({
   maxConcurrentPolls: Joi.number().integer().min(1).default(3),
   visibilityTimeout: Joi.number().integer().min(0).max(43200).default(30),
   waitTimeSeconds: Joi.number().integer().min(0).max(20).default(20),
+  timeout: Joi.number().integer().min(1).max(900).optional(), // Lambda timeout in seconds
   dlq: Joi.object({
     enabled: Joi.boolean().required(),
     maxReceiveCount: Joi.number().integer().min(1).default(3),

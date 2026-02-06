@@ -171,9 +171,11 @@ export class MessagePoller {
       const sqsEvent = this.eventBuilder.buildSQSEvent(messages, queueName);
 
       // Build function definition
+      // FunctionDefinition.timeout is in seconds (matching Serverless Framework convention).
+      // Prefer per-function timeout from serverless.yml; fall back to global config (which is in ms, so convert).
       const functionDefinition: FunctionDefinition = {
         handler,
-        timeout: this.config.lambdaTimeout,
+        timeout: queueConfig.timeout || this.config.lambdaTimeout / 1000,
       };
 
       // Invoke handler once for the entire batch

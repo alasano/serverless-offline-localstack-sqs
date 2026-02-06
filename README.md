@@ -102,6 +102,7 @@ custom:
         maxConcurrentPolls: 2
         visibilityTimeout: 60
         waitTimeSeconds: 20
+        timeout: 30 # Optional: Lambda timeout in seconds (overrides lambdaTimeout)
         dlq:
           enabled: true
           maxReceiveCount: 5

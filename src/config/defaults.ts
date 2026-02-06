@@ -25,6 +25,8 @@ export interface QueueConfig {
   maxConcurrentPolls?: number;
   visibilityTimeout?: number;
   waitTimeSeconds?: number;
+  /** Per-function Lambda timeout in seconds (from serverless.yml function definition) */
+  timeout?: number;
   dlq?: {
     enabled: boolean;
     maxReceiveCount?: number;
