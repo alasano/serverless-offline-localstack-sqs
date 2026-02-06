@@ -188,14 +188,15 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
             // Handle CloudFormation intrinsic functions
             if (sqsEvent.arn["Fn::GetAtt"]) {
               const logicalId = sqsEvent.arn["Fn::GetAtt"][0];
-              queueName = logicalId;
+              queueName = this.resolveQueueNameFromResource(logicalId) || logicalId;
               this.logger.debug(
-                `Resolved Fn::GetAtt for function ${functionName}: using logical resource ID "${logicalId}" as queue name`,
+                `Resolved Fn::GetAtt for function ${functionName}: logical ID "${logicalId}" resolved to queue name "${queueName}"`,
               );
             } else if (sqsEvent.arn["Ref"]) {
-              queueName = sqsEvent.arn["Ref"];
+              const logicalId = sqsEvent.arn["Ref"];
+              queueName = this.resolveQueueNameFromResource(logicalId) || logicalId;
               this.logger.debug(
-                `Resolved Ref for function ${functionName}: using "${sqsEvent.arn["Ref"]}" as queue name`,
+                `Resolved Ref for function ${functionName}: logical ID "${logicalId}" resolved to queue name "${queueName}"`,
               );
             } else {
               this.logger.warn(
@@ -234,6 +235,14 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
       this.logger.warn(`Failed to parse SQS event for function ${functionName}: ${error.message}`);
       return null;
     }
+  }
+
+  private resolveQueueNameFromResource(logicalId: string): string | undefined {
+    const resource = this.serverless.service.resources?.Resources?.[logicalId];
+    if (resource && resource.Type === "AWS::SQS::Queue" && resource.Properties?.QueueName) {
+      return resource.Properties.QueueName;
+    }
+    return undefined;
   }
 
   private async initialize(): Promise<void> {
