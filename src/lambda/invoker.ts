@@ -1,5 +1,6 @@
 import { resolve } from "path";
 import { existsSync } from "fs";
+import { createRequire } from "module";
 import { EventBuilder, SQSEvent, LambdaContext } from "./event-builder";
 import { Logger } from "../utils/logger";
 import { PluginConfig } from "../config/defaults";
@@ -22,12 +23,24 @@ export class LambdaInvoker {
   private eventBuilder: EventBuilder;
   private servicePath: string;
   private handlerCache: Map<string, any> = new Map();
+  private tsxRequireFn: ((specifier: string, parent: string) => any) | null = null;
 
   constructor(servicePath: string, config: PluginConfig, logger: Logger) {
     this.servicePath = servicePath;
     this.config = config;
     this.logger = logger;
     this.eventBuilder = new EventBuilder(config.region);
+
+    // Resolve tsx from the user's project (where serverless-offline installs it),
+    // not from the plugin's own directory. This handles npm link, nested node_modules, etc.
+    try {
+      const projectRequire = createRequire(resolve(servicePath, "package.json"));
+      const tsx = projectRequire("tsx/cjs/api");
+      this.tsxRequireFn = tsx.require;
+      this.logger.debug("tsx loaded for TypeScript handler support");
+    } catch {
+      this.logger.debug("tsx not available — TypeScript handlers will use regular require");
+    }
   }
 
   async invokeHandler(
@@ -93,10 +106,18 @@ export class LambdaInvoker {
     this.logger.debug(`Loading handler from: ${fullPath}`);
 
     try {
-      // Clear require cache to enable hot reloading
-      delete require.cache[require.resolve(fullPath)];
+      let module: any;
 
-      const module = require(fullPath);
+      if (fullPath.endsWith(".ts") && this.tsxRequireFn) {
+        // Use tsx for TypeScript files — handles compilation, extensionless
+        // imports, and import type erasure (matching serverless-offline behavior)
+        module = this.tsxRequireFn(fullPath, fullPath);
+      } else {
+        // Clear require cache to enable hot reloading
+        delete require.cache[require.resolve(fullPath)];
+        module = require(fullPath);
+      }
+
       const handler = module[handlerName];
 
       if (typeof handler !== "function") {
