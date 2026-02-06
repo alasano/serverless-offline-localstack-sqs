@@ -136,7 +136,7 @@ export class SqsClientWrapper {
       return response.Messages || [];
     } catch (error: any) {
       this.logger.error(`Failed to receive messages from ${queueUrl}: ${error.message}`);
-      return [];
+      throw error;
     }
   }
 

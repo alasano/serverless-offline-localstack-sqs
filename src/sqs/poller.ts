@@ -71,8 +71,20 @@ export class MessagePoller {
       this.pollers.set(pollerId, controller);
 
       const pollLoop = async () => {
+        let consecutiveErrors = 0;
         while (!controller.signal.aborted) {
-          await this.pollQueue(queueConfig, queueInfo);
+          try {
+            await this.pollQueue(queueConfig, queueInfo);
+            consecutiveErrors = 0;
+          } catch (error: any) {
+            consecutiveErrors++;
+            const backoff = Math.min(1000 * Math.pow(2, consecutiveErrors), 30000);
+            this.logger.error(
+              `Poll error for ${queueName} (attempt ${consecutiveErrors}): ${error.message}. Retrying in ${backoff}ms`
+            );
+            await new Promise(resolve => setTimeout(resolve, backoff));
+            continue;
+          }
           if (!controller.signal.aborted) {
             await new Promise(resolve => setTimeout(resolve, this.config.pollInterval));
           }
@@ -94,29 +106,30 @@ export class MessagePoller {
       return;
     }
 
+    state.lastPollTime = new Date();
+
+    // Let receiveMessages errors propagate to pollLoop for exponential backoff
+    const messages = await this.sqsClient.receiveMessages(
+      queueInfo.queueUrl,
+      queueConfig.batchSize || 1,
+      queueConfig.visibilityTimeout || this.config.visibilityTimeout,
+      queueConfig.waitTimeSeconds || this.config.waitTimeSeconds
+    );
+
+    if (messages.length === 0) {
+      this.logger.debug(`No messages received from queue: ${queueName}`);
+      return;
+    }
+
+    this.logger.debug(`Received ${messages.length} message(s) from queue: ${queueName}`);
+    state.messageCount += messages.length;
+
     try {
-      state.lastPollTime = new Date();
-      
-      const messages = await this.sqsClient.receiveMessages(
-        queueInfo.queueUrl,
-        queueConfig.batchSize || 1,
-        queueConfig.visibilityTimeout || this.config.visibilityTimeout,
-        queueConfig.waitTimeSeconds || this.config.waitTimeSeconds
-      );
-
-      if (messages.length === 0) {
-        this.logger.debug(`No messages received from queue: ${queueName}`);
-        return;
-      }
-
-      this.logger.debug(`Received ${messages.length} message(s) from queue: ${queueName}`);
-      state.messageCount += messages.length;
-
       await this.processMessages(messages, queueConfig, queueInfo);
     } catch (error: any) {
       state.errorCount++;
       state.lastError = error.message;
-      this.logger.error(`Error polling queue ${queueName}: ${error.message}`);
+      this.logger.error(`Error processing messages from queue ${queueName}: ${error.message}`);
     }
   }
 
@@ -170,7 +183,14 @@ export class MessagePoller {
 
       if (result.success) {
         // Delete all messages in the batch on success
-        const receiptHandles = messages.map(m => m.ReceiptHandle!);
+        const receiptHandles: string[] = [];
+        for (const message of messages) {
+          if (!message.ReceiptHandle) {
+            this.logger.warn(`Message ${message.MessageId} missing ReceiptHandle, skipping delete`);
+            continue;
+          }
+          receiptHandles.push(message.ReceiptHandle);
+        }
         await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
         this.logger.debug(`Successfully processed batch of ${messages.length} message(s) [${messageIds}] from queue: ${queueName}`);
       } else {
@@ -212,12 +232,16 @@ export class MessagePoller {
 
           // Delete original message — if this fails, the message may exist in both queues
           // temporarily, but it will eventually expire or be reprocessed from the source queue
-          try {
-            await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle!);
-          } catch (deleteError: any) {
-            this.logger.warn(
-              `Message ${message.MessageId} sent to DLQ but failed to delete from source queue: ${deleteError.message}`
-            );
+          if (!message.ReceiptHandle) {
+            this.logger.warn(`Message ${message.MessageId} missing ReceiptHandle, skipping delete from source queue`);
+          } else {
+            try {
+              await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle);
+            } catch (deleteError: any) {
+              this.logger.warn(
+                `Message ${message.MessageId} sent to DLQ but failed to delete from source queue: ${deleteError.message}`
+              );
+            }
           }
 
           this.logger.info(`Moved message ${message.MessageId} to DLQ: ${dlqName}`);
