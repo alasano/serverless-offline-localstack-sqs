@@ -19,7 +19,7 @@ export class MessagePoller {
   private eventBuilder: EventBuilder;
   private logger: Logger;
   private config: PluginConfig;
-  private pollers: Map<string, NodeJS.Timeout> = new Map();
+  private pollers: Map<string, AbortController> = new Map();
   private pollerStates: Map<string, PollerState> = new Map();
 
   constructor(
@@ -66,15 +66,20 @@ export class MessagePoller {
       });
 
       this.logger.info(`Started polling queue: ${queueName} -> ${handler}`);
-      
-      const poller = setInterval(async () => {
-        await this.pollQueue(queueConfig, queueInfo);
-      }, this.config.pollInterval);
 
-      this.pollers.set(pollerId, poller);
+      const controller = new AbortController();
+      this.pollers.set(pollerId, controller);
 
-      // Initial poll
-      setImmediate(() => this.pollQueue(queueConfig, queueInfo));
+      const pollLoop = async () => {
+        while (!controller.signal.aborted) {
+          await this.pollQueue(queueConfig, queueInfo);
+          if (!controller.signal.aborted) {
+            await new Promise(resolve => setTimeout(resolve, this.config.pollInterval));
+          }
+        }
+      };
+
+      pollLoop();
     } catch (error: any) {
       this.logger.error(`Failed to start poller for queue ${queueName}: ${error.message}`);
     }
@@ -214,8 +219,8 @@ export class MessagePoller {
   stopPolling(): void {
     this.logger.info('Stopping all SQS pollers');
 
-    for (const [pollerId, poller] of this.pollers.entries()) {
-      clearInterval(poller);
+    for (const [pollerId, controller] of this.pollers.entries()) {
+      controller.abort();
       const state = this.pollerStates.get(pollerId);
       if (state) {
         state.isPolling = false;

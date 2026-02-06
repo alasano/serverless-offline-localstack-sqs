@@ -66,6 +66,7 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
   private lambdaInvoker?: LambdaInvoker;
   private dockerDetector?: DockerDetector;
   private isInitialized = false;
+  private isStarted = false;
   private signalHandlersRegistered = false;
 
   constructor(serverless: ServerlessInstance, options: ServerlessOptions) {
@@ -275,10 +276,14 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
   }
 
   private async start(): Promise<void> {
+    if (this.isStarted) return;
+
     if (!this.config.enabled) {
       this.logger.info('Plugin disabled, skipping SQS polling');
       return;
     }
+
+    this.isStarted = true;
 
     await this.initialize();
     await this.createQueues();
@@ -331,6 +336,7 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
       this.lambdaInvoker.clearCache();
     }
 
+    this.isStarted = false;
     this.logger.info('Cleanup completed');
   }
 
