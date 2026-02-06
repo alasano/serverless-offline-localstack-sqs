@@ -66,6 +66,7 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
   private lambdaInvoker?: LambdaInvoker;
   private dockerDetector?: DockerDetector;
   private isInitialized = false;
+  private signalHandlersRegistered = false;
 
   constructor(serverless: ServerlessInstance, options: ServerlessOptions) {
     this.serverless = serverless;
@@ -305,14 +306,19 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
   }
 
   private setupGracefulShutdown(): void {
-    const shutdown = () => {
+    if (this.signalHandlersRegistered) return;
+
+    const shutdown = async () => {
       this.logger.info('Shutting down SQS polling...');
-      this.cleanup();
+      const forceExit = setTimeout(() => process.exit(1), 5000);
+      forceExit.unref();
+      await this.cleanup();
       process.exit(0);
     };
 
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
+    this.signalHandlersRegistered = true;
   }
 
   private async cleanup(): Promise<void> {
