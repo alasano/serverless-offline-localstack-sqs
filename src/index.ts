@@ -83,12 +83,17 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
     this.logger = createLogger("[serverless-offline-localstack-sqs]", this.config.debug);
 
     // Set up plugin lifecycle hooks
+    // Two command paths in serverless-offline:
+    //   `sls offline`       → fires: offline:start (single blocking event)
+    //   `sls offline start` → fires: offline:start:init, offline:start:ready, offline:start:end
     this.hooks = {
       "before:offline:start:init": this.initialize.bind(this),
       "before:offline:start": this.start.bind(this),
       "after:offline:start": this.cleanup.bind(this),
       "offline:start:init": this.initialize.bind(this),
       "offline:start": this.start.bind(this),
+      "offline:start:ready": this.start.bind(this),
+      "offline:start:end": this.cleanup.bind(this),
     };
 
     // Set up custom commands
