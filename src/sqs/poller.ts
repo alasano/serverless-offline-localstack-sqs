@@ -125,35 +125,43 @@ export class MessagePoller {
     queueConfig: QueueConfig,
     queueInfo: QueueInfo
   ): Promise<void> {
+    const batchSize = queueConfig.batchSize || 1;
     const maxConcurrency = queueConfig.maxConcurrentPolls || this.config.maxConcurrentPolls;
 
-    // Process messages in batches to respect concurrency limits
-    for (let i = 0; i < messages.length; i += maxConcurrency) {
-      const batch = messages.slice(i, i + maxConcurrency);
-      const promises = batch.map(message => this.processMessage(message, queueConfig, queueInfo));
-      
+    // Group messages into chunks of batchSize (matching AWS Lambda event batching)
+    const chunks: Message[][] = [];
+    for (let i = 0; i < messages.length; i += batchSize) {
+      chunks.push(messages.slice(i, i + batchSize));
+    }
+
+    // Process chunks with concurrency limits
+    for (let i = 0; i < chunks.length; i += maxConcurrency) {
+      const concurrentChunks = chunks.slice(i, i + maxConcurrency);
+      const promises = concurrentChunks.map(chunk => this.processBatch(chunk, queueConfig, queueInfo));
+
       await Promise.all(promises);
     }
   }
 
-  private async processMessage(
-    message: Message,
+  private async processBatch(
+    messages: Message[],
     queueConfig: QueueConfig,
     queueInfo: QueueInfo
   ): Promise<void> {
     const { queueName, handler } = queueConfig;
+    const messageIds = messages.map(m => m.MessageId).join(', ');
 
     try {
-      // Build SQS event with single message
-      const sqsEvent = this.eventBuilder.buildSQSEvent([message], queueName);
-      
+      // Build SQS event with all messages in the batch
+      const sqsEvent = this.eventBuilder.buildSQSEvent(messages, queueName);
+
       // Build function definition
       const functionDefinition: FunctionDefinition = {
         handler,
         timeout: this.config.lambdaTimeout,
       };
 
-      // Invoke handler
+      // Invoke handler once for the entire batch
       const result: HandlerResult = await this.lambdaInvoker.invokeHandler(
         handler,
         sqsEvent,
@@ -161,16 +169,21 @@ export class MessagePoller {
       );
 
       if (result.success) {
-        // Delete message on successful processing
-        await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle!);
-        this.logger.debug(`Successfully processed message ${message.MessageId} from queue: ${queueName}`);
+        // Delete all messages in the batch on success
+        const receiptHandles = messages.map(m => m.ReceiptHandle!);
+        await this.sqsClient.deleteMessages(queueInfo.queueUrl, receiptHandles);
+        this.logger.debug(`Successfully processed batch of ${messages.length} message(s) [${messageIds}] from queue: ${queueName}`);
       } else {
-        // Handle failure - message will become visible again after visibility timeout
-        await this.handleMessageFailure(message, queueConfig, queueInfo, result.error);
+        // On failure, all messages in the batch fail together (AWS synchronous invocation behavior)
+        for (const message of messages) {
+          await this.handleMessageFailure(message, queueConfig, queueInfo, result.error);
+        }
       }
     } catch (error: any) {
-      this.logger.error(`Unexpected error processing message ${message.MessageId}: ${error.message}`);
-      await this.handleMessageFailure(message, queueConfig, queueInfo, error);
+      this.logger.error(`Unexpected error processing batch [${messageIds}]: ${error.message}`);
+      for (const message of messages) {
+        await this.handleMessageFailure(message, queueConfig, queueInfo, error);
+      }
     }
   }
 
