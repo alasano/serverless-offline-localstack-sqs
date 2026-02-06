@@ -97,7 +97,7 @@ export class LambdaInvoker {
       // Clear require cache to enable hot reloading
       delete require.cache[require.resolve(fullPath)];
       
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const module = require(fullPath);
       const handler = module[handlerName];
 
@@ -179,7 +179,7 @@ export class LambdaInvoker {
         if (!isResolved) {
           isResolved = true;
           clearTimeout(timeout);
-          error ? reject(error) : resolve(result);
+          if (error) { reject(error); } else { resolve(result); }
         }
       };
 
@@ -205,7 +205,7 @@ export class LambdaInvoker {
           if (!isResolved) {
             isResolved = true;
             clearTimeout(timeout);
-            error ? reject(error) : resolve(response);
+            if (error) { reject(error); } else { resolve(response); }
           }
         });
 

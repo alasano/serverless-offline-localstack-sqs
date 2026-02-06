@@ -120,7 +120,7 @@ export class EventBuilder {
 
   private calculateMD5(body: string): string {
     // Simple MD5 placeholder - in a real implementation, you'd use crypto
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const crypto = require('crypto');
     return crypto.createHash('md5').update(body).digest('hex');
   }

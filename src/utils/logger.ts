@@ -15,23 +15,23 @@ export class ConsoleLogger implements Logger {
   }
 
   info(message: string, ...args: any[]): void {
-    // eslint-disable-next-line no-console
+     
     console.log(`${this.prefix} ${message}`, ...args);
   }
 
   warn(message: string, ...args: any[]): void {
-    // eslint-disable-next-line no-console
+     
     console.warn(`${this.prefix} ⚠️  ${message}`, ...args);
   }
 
   error(message: string, ...args: any[]): void {
-    // eslint-disable-next-line no-console
+     
     console.error(`${this.prefix} ❌ ${message}`, ...args);
   }
 
   debug(message: string, ...args: any[]): void {
     if (this.debugEnabled) {
-      // eslint-disable-next-line no-console
+       
       console.log(`${this.prefix} 🐛 ${message}`, ...args);
     }
   }
