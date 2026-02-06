@@ -160,11 +160,7 @@ export class LambdaInvoker {
         }
       }, context.getRemainingTimeInMillis());
 
-      // Override context methods
-      const originalDone = context.done;
-      const originalSucceed = context.succeed;
-      const originalFail = context.fail;
-
+      // Override context methods to resolve/reject the wrapping Promise
       context.done = (error?: Error, result?: any) => {
         if (!isResolved) {
           isResolved = true;
@@ -223,11 +219,6 @@ export class LambdaInvoker {
           clearTimeout(timeout);
           reject(error);
         }
-      } finally {
-        // Restore original context methods
-        context.done = originalDone;
-        context.succeed = originalSucceed;
-        context.fail = originalFail;
       }
     });
   }
