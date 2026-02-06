@@ -180,8 +180,26 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
         queueName = arnParts[arnParts.length - 1];
       } else if (typeof sqsEvent === 'object') {
         if (sqsEvent.arn) {
-          const arnParts = sqsEvent.arn.split(':');
-          queueName = arnParts[arnParts.length - 1];
+          if (typeof sqsEvent.arn === 'string') {
+            const arnParts = sqsEvent.arn.split(':');
+            queueName = arnParts[arnParts.length - 1];
+          } else if (typeof sqsEvent.arn === 'object') {
+            // Handle CloudFormation intrinsic functions
+            if (sqsEvent.arn['Fn::GetAtt']) {
+              const logicalId = sqsEvent.arn['Fn::GetAtt'][0];
+              queueName = logicalId;
+              this.logger.debug(`Resolved Fn::GetAtt for function ${functionName}: using logical resource ID "${logicalId}" as queue name`);
+            } else if (sqsEvent.arn['Ref']) {
+              queueName = sqsEvent.arn['Ref'];
+              this.logger.debug(`Resolved Ref for function ${functionName}: using "${sqsEvent.arn['Ref']}" as queue name`);
+            } else {
+              this.logger.warn(`Unresolvable ARN value for function ${functionName}: ${JSON.stringify(sqsEvent.arn)}`);
+              return null;
+            }
+          } else {
+            this.logger.warn(`Unexpected ARN type for function ${functionName}: ${JSON.stringify(sqsEvent.arn)}`);
+            return null;
+          }
         } else if (sqsEvent.queueName) {
           queueName = sqsEvent.queueName;
         } else {

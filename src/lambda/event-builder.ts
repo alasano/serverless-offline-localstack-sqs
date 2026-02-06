@@ -7,6 +7,7 @@ export interface SQSRecord {
   attributes: Record<string, string>;
   messageAttributes: Record<string, any>;
   md5OfBody: string;
+  md5OfMessageAttributes?: string;
   eventSource: string;
   eventSourceARN: string;
   awsRegion: string;
@@ -56,6 +57,7 @@ export class EventBuilder {
       },
       messageAttributes: this.formatMessageAttributes(message.MessageAttributes || {}),
       md5OfBody: message.MD5OfBody || this.calculateMD5(message.Body!),
+      ...(message.MD5OfMessageAttributes ? { md5OfMessageAttributes: message.MD5OfMessageAttributes } : {}),
       eventSource: 'aws:sqs',
       eventSourceARN: this.buildQueueArn(queueName),
       awsRegion: this.region,

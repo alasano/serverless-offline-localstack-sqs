@@ -166,12 +166,13 @@ export class LambdaInvoker {
       let isResolved = false;
 
       // Set up timeout
+      const timeoutMs = context.getRemainingTimeInMillis();
       const timeout = setTimeout(() => {
         if (!isResolved) {
           isResolved = true;
-          reject(new Error(`Handler timed out after ${context.getRemainingTimeInMillis()}ms`));
+          reject(new Error(`Handler timed out after ${timeoutMs}ms`));
         }
-      }, context.getRemainingTimeInMillis());
+      }, timeoutMs);
 
       // Override context methods to resolve/reject the wrapping Promise
       context.done = (error?: Error, result?: any) => {
