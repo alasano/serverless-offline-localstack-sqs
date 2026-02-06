@@ -169,6 +169,20 @@ export class QueueManager {
         attributes.DelaySeconds = properties.DelaySeconds.toString();
       }
 
+      // Map FIFO-specific CloudFormation properties
+      if (properties.FifoQueue != null) {
+        attributes.FifoQueue = properties.FifoQueue.toString();
+      }
+      if (properties.ContentBasedDeduplication != null) {
+        attributes.ContentBasedDeduplication = properties.ContentBasedDeduplication.toString();
+      }
+      if (properties.DeduplicationScope != null) {
+        attributes.DeduplicationScope = properties.DeduplicationScope;
+      }
+      if (properties.FifoThroughputLimit != null) {
+        attributes.FifoThroughputLimit = properties.FifoThroughputLimit;
+      }
+
       // Handle redrive policy
       let dlqName: string | undefined;
       if (properties.RedrivePolicy) {
@@ -199,23 +213,34 @@ export class QueueManager {
   }
 
   private sanitizeQueueName(queueName: string): string {
+    // Detect and preserve .fifo suffix — FIFO queues must end with .fifo
+    const isFifo = queueName.endsWith('.fifo');
+    const baseName = isFifo ? queueName.slice(0, -5) : queueName;
+
     // SQS queue names can only contain alphanumeric characters, hyphens, and underscores
     // Replace dots and other invalid characters with hyphens
-    let sanitized = queueName.replace(/[^a-zA-Z0-9_-]/g, '-');
-    
+    let sanitized = baseName.replace(/[^a-zA-Z0-9_-]/g, '-');
+
     // Ensure length is between 1 and 80 characters
-    if (sanitized.length > 80) {
-      sanitized = sanitized.substring(0, 80);
+    // For FIFO queues, the .fifo suffix takes 5 chars, so base name max is 75
+    const maxLength = isFifo ? 75 : 80;
+    if (sanitized.length > maxLength) {
+      sanitized = sanitized.substring(0, maxLength);
     }
-    
+
     // Remove trailing hyphens that might have been added
     sanitized = sanitized.replace(/-+$/, '');
-    
+
     // Ensure we don't have an empty string
     if (sanitized.length === 0) {
       sanitized = 'queue';
     }
-    
+
+    // Re-append .fifo suffix if originally present
+    if (isFifo) {
+      sanitized += '.fifo';
+    }
+
     return sanitized;
   }
 
