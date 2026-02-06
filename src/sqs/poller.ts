@@ -207,20 +207,19 @@ export class MessagePoller {
         const dlqInfo = await this.sqsClient.getQueueInfo(dlqName);
         
         if (dlqInfo) {
-          // Send message to DLQ
-          const dlqBody = JSON.stringify({
-            originalMessage: message,
-            failureReason: error?.message || 'Handler execution failed',
-            failureTime: new Date().toISOString(),
-            queueName: queueConfig.queueName,
-            handler: queueConfig.handler,
-          });
+          // Send message to DLQ with original body preserved (matches real AWS redrive behavior)
+          await this.sqsClient.sendMessage(dlqInfo.queueUrl, message.Body || '');
 
-          await this.sqsClient.sendMessage(dlqInfo.queueUrl, dlqBody);
-          
-          // Delete original message
-          await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle!);
-          
+          // Delete original message — if this fails, the message may exist in both queues
+          // temporarily, but it will eventually expire or be reprocessed from the source queue
+          try {
+            await this.sqsClient.deleteMessage(queueInfo.queueUrl, message.ReceiptHandle!);
+          } catch (deleteError: any) {
+            this.logger.warn(
+              `Message ${message.MessageId} sent to DLQ but failed to delete from source queue: ${deleteError.message}`
+            );
+          }
+
           this.logger.info(`Moved message ${message.MessageId} to DLQ: ${dlqName}`);
         }
       } catch (dlqError: any) {
