@@ -33,6 +33,7 @@ export interface QueueConfig {
     maxReceiveCount?: number;
     queueName?: string;
   };
+  environment?: Record<string, string>;
 }
 
 export const defaultConfig: PluginConfig = {

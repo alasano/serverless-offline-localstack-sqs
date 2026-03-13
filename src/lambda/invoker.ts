@@ -15,6 +15,7 @@ export interface FunctionDefinition {
   handler: string;
   timeout?: number;
   runtime?: string;
+  environment?: Record<string, string>;
 }
 
 export class LambdaInvoker {
@@ -48,6 +49,14 @@ export class LambdaInvoker {
     sqsEvent: SQSEvent,
     functionDefinition: FunctionDefinition,
   ): Promise<HandlerResult> {
+    // Apply function environment variables to process.env (matching serverless-offline behavior)
+    const envOverrides = functionDefinition.environment || {};
+    const savedEnv: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(envOverrides)) {
+      savedEnv[key] = process.env[key];
+      process.env[key] = value;
+    }
+
     try {
       this.logger.debug(
         `Invoking handler: ${handlerPath} with ${sqsEvent.Records.length} message(s)`,
@@ -78,6 +87,15 @@ export class LambdaInvoker {
     } catch (error: any) {
       this.logger.error(`Failed to invoke handler ${handlerPath}:`, error.message);
       return { success: false, error };
+    } finally {
+      // Restore original process.env values to prevent leaking between function invocations
+      for (const [key, originalValue] of Object.entries(savedEnv)) {
+        if (originalValue === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = originalValue;
+        }
+      }
     }
   }
 

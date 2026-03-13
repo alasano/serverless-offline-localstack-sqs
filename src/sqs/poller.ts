@@ -176,6 +176,7 @@ export class MessagePoller {
       const functionDefinition: FunctionDefinition = {
         handler,
         timeout: queueConfig.timeout || this.config.lambdaTimeout / 1000,
+        environment: queueConfig.environment,
       };
 
       // Invoke handler once for the entire batch

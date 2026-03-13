@@ -15,6 +15,7 @@ export interface ServerlessInstance {
       region?: string;
       stage?: string;
       runtime?: string;
+      environment?: Record<string, string>;
     };
     functions?: Record<string, any>;
     resources?: {
@@ -244,6 +245,12 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
         functionResponseTypes = [sqsEvent.functionResponseType];
       }
 
+      // Merge provider-level and function-level environment variables.
+      // Function-level overrides provider-level (matching AWS Lambda behavior).
+      const providerEnv = this.serverless.service.provider.environment || {};
+      const functionEnv = functionDef.environment || {};
+      const environment = { ...providerEnv, ...functionEnv };
+
       return {
         queueName,
         handler: functionDef.handler,
@@ -252,6 +259,7 @@ export default class ServerlessOfflineLocalstackSqsPlugin {
         // Serverless Framework timeout is in seconds (e.g., timeout: 30 means 30s)
         ...(functionDef.timeout != null ? { timeout: functionDef.timeout } : {}),
         ...(functionResponseTypes ? { functionResponseTypes } : {}),
+        ...(Object.keys(environment).length > 0 ? { environment } : {}),
       };
     } catch (error: any) {
       this.logger.warn(`Failed to parse SQS event for function ${functionName}: ${error.message}`);

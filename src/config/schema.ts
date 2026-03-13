@@ -17,6 +17,7 @@ const queueConfigSchema = Joi.object({
     maxReceiveCount: Joi.number().integer().min(1).default(3),
     queueName: Joi.string().optional(),
   }).optional(),
+  environment: Joi.object().pattern(Joi.string(), Joi.string()).optional(),
 });
 
 export const configSchema = Joi.object({

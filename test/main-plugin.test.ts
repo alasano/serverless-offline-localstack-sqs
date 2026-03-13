@@ -369,6 +369,96 @@ describe("ServerlessOfflineLocalstackSqsPlugin", () => {
       expect(pluginUnsupportedSqs).toBeInstanceOf(ServerlessOfflineLocalstackSqsPlugin);
     });
 
+    it("should merge provider-level environment into queue config", () => {
+      const serverlessWithProviderEnv = {
+        ...serverlessInstance,
+        service: {
+          ...serverlessInstance.service,
+          provider: {
+            ...serverlessInstance.service.provider,
+            environment: {
+              TYPESENSE_API_KEY: "test-key",
+              MONGO_URL: "mongodb://localhost",
+            },
+          },
+          functions: {
+            testFunction: {
+              handler: "handler.test",
+              events: [
+                {
+                  sqs: {
+                    arn: "arn:aws:sqs:us-east-1:123456789012:test-queue",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const pluginWithEnv = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessWithProviderEnv,
+        options,
+      );
+      const config = (pluginWithEnv as any).config;
+      const queue = config.queues.find((q: any) => q.queueName === "test-queue");
+      expect(queue.environment).toEqual({
+        TYPESENSE_API_KEY: "test-key",
+        MONGO_URL: "mongodb://localhost",
+      });
+    });
+
+    it("should merge function-level environment overriding provider-level", () => {
+      const serverlessWithBothEnv = {
+        ...serverlessInstance,
+        service: {
+          ...serverlessInstance.service,
+          provider: {
+            ...serverlessInstance.service.provider,
+            environment: {
+              SHARED_VAR: "from-provider",
+              PROVIDER_ONLY: "provider-value",
+            },
+          },
+          functions: {
+            testFunction: {
+              handler: "handler.test",
+              environment: {
+                SHARED_VAR: "from-function",
+                FUNCTION_ONLY: "function-value",
+              },
+              events: [
+                {
+                  sqs: {
+                    arn: "arn:aws:sqs:us-east-1:123456789012:test-queue",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const pluginWithBothEnv = new ServerlessOfflineLocalstackSqsPlugin(
+        serverlessWithBothEnv,
+        options,
+      );
+      const config = (pluginWithBothEnv as any).config;
+      const queue = config.queues.find((q: any) => q.queueName === "test-queue");
+      expect(queue.environment).toEqual({
+        SHARED_VAR: "from-function",
+        PROVIDER_ONLY: "provider-value",
+        FUNCTION_ONLY: "function-value",
+      });
+    });
+
+    it("should not include environment when neither provider nor function define it", () => {
+      // The default serverlessInstance has no environment at either level
+      const config = (plugin as any).config;
+      const queue = config.queues.find((q: any) => q.queueName === "test-queue");
+      expect(queue.environment).toBeUndefined();
+    });
+
     it("should handle malformed function definitions that cause parsing errors", () => {
       const serverlessMalformed = {
         ...serverlessInstance,
